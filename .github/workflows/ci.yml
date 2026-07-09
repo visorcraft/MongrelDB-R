@@ -18,8 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 4.0 is the supported minimum; release is current.
-        r: ['4.0', 'release', 'devel']
+        # 4.4 is the supported minimum; release is current.
+        r: ['4.4', 'release', 'devel']
     steps:
       - name: Checkout
         uses: actions/checkout@v5

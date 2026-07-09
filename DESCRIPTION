@@ -14,7 +14,7 @@ License: MIT + file LICENSE
 URL: https://github.com/visorcraft/MongrelDB-R, https://www.mongreldb.com
 BugReports: https://github.com/visorcraft/MongrelDB-R/issues
 Depends:
-    R (>= 4.0)
+    R (>= 4.4)
 Imports:
     curl,
     jsonlite,
