@@ -130,7 +130,7 @@ do_request <- function(method, url, headers, content) {
 encode_payload <- function(payload) {
   reject_nonfinite(payload)
   jsonlite::toJSON(payload, auto_unbox = TRUE, null = "null",
-                   NA = "null")
+                   na = "null")
 }
 
 # Recursively walk a payload and stop with a query error if any numeric value
