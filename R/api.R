@@ -114,16 +114,19 @@ mongreldb_delete_by_pk <- function(client, table, pk) {
 
 #' Execute SQL.
 #'
-#' Returns the decoded JSON when the daemon answers in JSON; otherwise `NULL`
-#' (e.g. for INSERTs or Arrow IPC responses).
+#' Requests the JSON result format, so a SELECT returns a JSON array of row
+#' objects keyed by column name. Returns the decoded rows for SELECTs, or
+#' `NULL` for statements like INSERT/UPDATE that produce no rows.
 #' @inheritParams mongreldb_health
 #' @param statement A SQL statement.
 #' @export
 mongreldb_sql <- function(client, statement) {
-  # SQL SELECT may return Arrow IPC bytes (non-JSON), which request() rejects.
-  # Catch that specific case and return NULL for binary responses.
+  # JSON mode makes the server answer with a JSON array of row objects
+  # (column names as keys) instead of Arrow IPC bytes. A statement that
+  # produces no rows (INSERT/UPDATE) may still answer with an empty/non-JSON
+  # body, so tolerate that and return NULL.
   tryCatch(
-    request(client, "POST", "sql", list(sql = statement)),
+    request(client, "POST", "sql", list(sql = statement, format = "json")),
     error = function(e) {
       if (grepl("malformed JSON", conditionMessage(e), ignore.case = TRUE)) {
         NULL

@@ -92,6 +92,15 @@ request <- function(client, method, path, payload = NULL) {
   status <- resp$status_code
   body <- rawToChar(resp$content)
 
+  # Cap the response body at 256 MB so a runaway query or a misbehaving
+  # daemon cannot exhaust memory.
+  max_bytes <- 256L * 1024L * 1024L # 268435456 bytes
+  if (length(resp$content) > max_bytes) {
+    stop(new_error("query",
+      sprintf("response body exceeds %d bytes (%d bytes)",
+              max_bytes, length(resp$content))))
+  }
+
   if (is.na(status) || status < 200 || status >= 300) {
     env <- parse_error_envelope(body)
     message <- env$message

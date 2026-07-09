@@ -39,6 +39,11 @@ test_that("createTable, put, count, query round-trip", {
   res <- mongreldb_query(db, table,
     list(mongreldb_condition("pk", list(value = 2))))
   expect_gte(length(res$rows), 1)
+  # The returned row must carry primary key 2. Confirm via SQL JSON mode,
+  # where rows are keyed by column name.
+  pk_rows <- mongreldb_sql(db, sprintf("SELECT id FROM %s WHERE id = 2", table))
+  expect_gte(length(pk_rows), 1)
+  expect_equal(pk_rows[[1]]$id, 2)
 })
 
 test_that("upsert updates on PK conflict", {
@@ -49,6 +54,11 @@ test_that("upsert updates on PK conflict", {
   mongreldb_upsert(db, table, list(`1` = 1, `2` = "alpha", `3` = 99.0),
     list(`3` = 99.0))
   expect_equal(mongreldb_count(db, table), 1L)
+  # Query the row back and verify the upserted value landed. SQL JSON mode
+  # returns rows keyed by column name.
+  up_rows <- mongreldb_sql(db, sprintf("SELECT amount FROM %s WHERE id = 1", table))
+  expect_gte(length(up_rows), 1)
+  expect_equal(up_rows[[1]]$amount, 99.0)
 })
 
 test_that("transaction commits multiple ops atomically", {
@@ -77,6 +87,11 @@ test_that("sql round-trips", {
   mongreldb_sql(db, sprintf(
     "INSERT INTO %s (id, label, amount) VALUES (2, 'beta', 2.0)", table))
   expect_equal(mongreldb_count(db, table), 2L)
+  # JSON mode makes SELECT return rows as JSON objects (column names as
+  # keys). Verify both rows come back with the right primary keys.
+  selected <- mongreldb_sql(db, sprintf("SELECT id FROM %s ORDER BY id", table))
+  expect_equal(length(selected), 2)
+  expect_equal(vapply(selected, function(r) r$id, numeric(1)), c(1, 2))
 })
 
 test_that("schema lists the created table", {
@@ -110,6 +125,11 @@ test_that("range query returns only rows within the bounds", {
       max_inclusive = TRUE
     ))))
   expect_equal(length(res$rows), 2L)
+  # Only rows with id 3 (amount 90) and 4 (amount 100) qualify. Confirm their
+  # exact PK values via SQL JSON mode (rows keyed by column name).
+  selected <- mongreldb_sql(db,
+    sprintf("SELECT id FROM %s WHERE amount >= 80.0 ORDER BY id", table))
+  expect_equal(vapply(selected, function(r) r$id, numeric(1)), c(3, 4))
 })
 
 test_that("tables() lists the created table", {
