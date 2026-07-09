@@ -88,3 +88,58 @@ test_that("schema lists the created table", {
   desc <- mongreldb_schema_for(db, table)
   expect_gt(length(desc), 0)
 })
+
+test_that("range query returns only rows within the bounds", {
+  db <- mongreldb_connect(server_url)
+  table <- paste0("r_range_", unique_suffix)
+  mongreldb_create_table(db, table, columns)
+  mongreldb_put(db, table, list(`1` = 1, `2` = "a", `3` = 50.0))
+  mongreldb_put(db, table, list(`1` = 2, `2` = "b", `3` = 75.0))
+  mongreldb_put(db, table, list(`1` = 3, `2` = "c", `3` = 90.0))
+  mongreldb_put(db, table, list(`1` = 4, `2` = "d", `3` = 100.0))
+  # Only scores >= 80 should come back (90 and 100) - assert the count.
+  res <- mongreldb_query(db, table,
+    list(mongreldb_condition("range", list(column = 3, min = 80.0))))
+  expect_equal(length(res$rows), 2L)
+})
+
+test_that("tables() lists the created table", {
+  db <- mongreldb_connect(server_url)
+  table <- paste0("r_tables_", unique_suffix)
+  mongreldb_create_table(db, table, columns)
+  names <- mongreldb_tables(db)
+  expect_true(table %in% names)
+})
+
+test_that("schema_for on a nonexistent table raises a not_found error", {
+  db <- mongreldb_connect(server_url)
+  err <- tryCatch(
+    mongreldb_schema_for(db, "nonexistent_table_xyz"),
+    error = function(e) e
+  )
+  expect_s3_class(err, "mongreldb_error")
+  expect_equal(err$kind, "not_found")
+})
+
+test_that("idempotent transaction does not duplicate the row", {
+  db <- mongreldb_connect(server_url)
+  table <- paste0("r_idem_", unique_suffix)
+  mongreldb_create_table(db, table, columns)
+  # First idempotent commit inserts the row.
+  mongreldb_transaction(db, list(
+    list(put = list(table = table,
+      cells = list(1, 100, 2, "order", 3, 1.0)))
+  ), idempotency_key = "order-100-create")
+  expect_equal(mongreldb_count(db, table), 1L)
+  # A second, identical commit with the SAME key must not duplicate it.
+  tryCatch(
+    mongreldb_transaction(db, list(
+      list(put = list(table = table,
+        cells = list(1, 100, 2, "order", 3, 1.0)))
+    ), idempotency_key = "order-100-create"),
+    error = function(e) {
+      # The daemon may reject the duplicate; the row count is what matters.
+    }
+  )
+  expect_equal(mongreldb_count(db, table), 1L)
+})
