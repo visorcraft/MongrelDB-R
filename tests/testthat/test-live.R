@@ -98,8 +98,17 @@ test_that("range query returns only rows within the bounds", {
   mongreldb_put(db, table, list(`1` = 3, `2` = "c", `3` = 90.0))
   mongreldb_put(db, table, list(`1` = 4, `2` = "d", `3` = 100.0))
   # Only scores >= 80 should come back (90 and 100) - assert the count.
+  # The `amount` column is float64, so use `range_f64` (plain `range`
+  # expects an i64 bound and rejects floats). range_f64 requires both
+  # bounds (min/max) and the inclusivity flags (min_inclusive/max_inclusive).
   res <- mongreldb_query(db, table,
-    list(mongreldb_condition("range", list(column = 3, min = 80.0))))
+    list(mongreldb_condition("range_f64", list(
+      column = 3,
+      min = 80.0,
+      max = 200.0,
+      min_inclusive = TRUE,
+      max_inclusive = TRUE
+    ))))
   expect_equal(length(res$rows), 2L)
 })
 
@@ -125,18 +134,21 @@ test_that("idempotent transaction does not duplicate the row", {
   db <- mongreldb_connect(server_url)
   table <- paste0("r_idem_", unique_suffix)
   mongreldb_create_table(db, table, columns)
+  # Idempotency key must be unique per run so a stale key from an earlier
+  # run can't be replayed against this table.
+  key <- paste0("order-100-create-", unique_suffix)
   # First idempotent commit inserts the row.
   mongreldb_transaction(db, list(
     list(put = list(table = table,
       cells = list(1, 100, 2, "order", 3, 1.0)))
-  ), idempotency_key = "order-100-create")
+  ), idempotency_key = key)
   expect_equal(mongreldb_count(db, table), 1L)
   # A second, identical commit with the SAME key must not duplicate it.
   tryCatch(
     mongreldb_transaction(db, list(
       list(put = list(table = table,
         cells = list(1, 100, 2, "order", 3, 1.0)))
-    ), idempotency_key = "order-100-create"),
+    ), idempotency_key = key),
     error = function(e) {
       # The daemon may reject the duplicate; the row count is what matters.
     }

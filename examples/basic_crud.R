@@ -3,7 +3,7 @@
 # Connects to a running mongreldb-server, creates a table, inserts rows,
 # queries them back, and prints the count.
 #
-#   Rscript examples/basic_crud.R
+#   Rscript -e 'library(MongrelDB); source("examples/basic_crud.R")'
 
 library(MongrelDB)
 
@@ -12,6 +12,13 @@ db <- mongreldb_connect(url)
 
 cat("health:", mongreldb_health(db), "\n")
 
+# Per-run unique suffix so concurrent/CI runs never collide on a table name.
+table <- sprintf("r_orders_example_%d", as.integer(Sys.time()))
+
+# Guaranteed cleanup: ALWAYS drop the table at exit, even if the body errors,
+# so CI runs never leave an orphan table behind.
+on.exit(try(mongreldb_drop_table(db, table), silent = TRUE))
+
 # The daemon requires JSON booleans for primary_key / nullable.
 columns <- list(
   list(id = 1, name = "id",       ty = "int64",   primary_key = TRUE,  nullable = FALSE),
@@ -19,7 +26,6 @@ columns <- list(
   list(id = 3, name = "amount",   ty = "float64", primary_key = FALSE, nullable = FALSE)
 )
 
-table <- "r_orders_example"
 mongreldb_create_table(db, table, columns)
 
 # Cells map column id to value.

@@ -47,8 +47,11 @@ jobs:
             local::.
 
       - name: Run unit tests
+        # testthat::test_file() does NOT load the package (unlike test_check()
+        # in tests/testthat.R), so load MongrelDB explicitly first or every
+        # mongreldb_* call fails with "could not find function".
         run: |
-          Rscript -e 'testthat::test_file("tests/testthat/test-json.R", reporter = "summary")'
+          Rscript -e 'library(MongrelDB); testthat::test_file("tests/testthat/test-json.R", reporter = "summary")'
 
       - name: R CMD check
         run: |
@@ -98,7 +101,7 @@ jobs:
       - name: Download mongreldb-server
         if: steps.server-cache.outputs.cache-hit != 'true'
         run: |
-          curl -L -o /tmp/mongreldb-server \
+          curl -fsSL -o /tmp/mongreldb-server \
             https://github.com/visorcraft/MongrelDB/releases/download/v0.44.1/mongreldb-server-linux-x64
           chmod +x /tmp/mongreldb-server
 
@@ -119,8 +122,22 @@ jobs:
       - name: Run live tests
         env:
           MONGRELDB_URL: http://127.0.0.1:8453
+        # testthat::test_file() does NOT load the package (unlike test_check()
+        # in tests/testthat.R), so load MongrelDB explicitly first or every
+        # mongreldb_* call fails with "could not find function".
         run: |
-          Rscript -e 'testthat::test_file("tests/testthat/test-live.R", reporter = "summary")'
+          Rscript -e 'library(MongrelDB); testthat::test_file("tests/testthat/test-live.R", reporter = "summary")'
+
+      - name: Run examples
+        env:
+          MONGRELDB_URL: http://127.0.0.1:8453
+        # `library(MongrelDB)` must be attached before sourcing the example,
+        # since Rscript does not auto-load an installed package.
+        run: |
+          for ex in examples/*.R; do
+            echo "=== Running $ex ==="
+            Rscript -e "library(MongrelDB); source('$ex')" || { echo "FAILED: $ex"; exit 1; }
+          done
 
       - name: Dump server log on failure
         if: failure()
