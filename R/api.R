@@ -43,7 +43,7 @@ mongreldb_create_table <- function(client, name, columns) {
 #' @param name Table name.
 #' @export
 mongreldb_drop_table <- function(client, name) {
-  request(client, "DELETE", paste0("tables/", name))
+  request(client, "DELETE", paste0("tables/", encode_segment(name)))
   invisible(NULL)
 }
 
@@ -53,8 +53,12 @@ mongreldb_drop_table <- function(client, name) {
 #' @return Integer row count.
 #' @export
 mongreldb_count <- function(client, table) {
-  data <- request(client, "GET", paste0("tables/", table, "/count"))
-  if (is.list(data) && !is.null(data$count)) as.integer(data$count) else 0L
+  data <- request(client, "GET", paste0("tables/", encode_segment(table), "/count"))
+  if (is.list(data) && !is.null(data$count) && is.numeric(data$count)) {
+    as.integer(data$count)
+  } else {
+    stop(new_error("query", "malformed count response from server"))
+  }
 }
 
 #' Insert a row.
@@ -116,7 +120,18 @@ mongreldb_delete_by_pk <- function(client, table, pk) {
 #' @param statement A SQL statement.
 #' @export
 mongreldb_sql <- function(client, statement) {
-  request(client, "POST", "sql", list(sql = statement))
+  # SQL SELECT may return Arrow IPC bytes (non-JSON), which request() rejects.
+  # Catch that specific case and return NULL for binary responses.
+  tryCatch(
+    request(client, "POST", "sql", list(sql = statement)),
+    error = function(e) {
+      if (grepl("malformed JSON", conditionMessage(e), ignore.case = TRUE)) {
+        NULL
+      } else {
+        stop(e)
+      }
+    }
+  )
 }
 
 #' Run a native query.
@@ -156,7 +171,7 @@ mongreldb_schema <- function(client) {
 #' @inheritParams mongreldb_count
 #' @export
 mongreldb_schema_for <- function(client, table) {
-  data <- request(client, "GET", paste0("kit/schema/", table))
+  data <- request(client, "GET", paste0("kit/schema/", encode_segment(table)))
   if (is.list(data)) data else list()
 }
 

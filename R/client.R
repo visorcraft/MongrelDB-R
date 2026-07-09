@@ -103,11 +103,16 @@ request <- function(client, method, path, payload = NULL) {
   }
 
   if (!nzchar(body)) return(NULL)
-  # SQL SELECT returns Arrow IPC bytes; guard against non-JSON so sql()
-  # stays best-effort.
+  # SQL SELECT may return Arrow IPC bytes (non-JSON). For the generic request
+  # path, a non-empty body that is not valid JSON is a protocol error, not a
+  # silent NULL. The sql() helper can tolerate NULL/binary separately.
   tryCatch(
     jsonlite::fromJSON(body, simplifyVector = FALSE),
-    error = function(e) NULL
+    error = function(e) {
+      stop(new_error("query",
+        paste0("malformed JSON response from server: ",
+               conditionMessage(e))))
+    }
   )
 }
 
@@ -115,6 +120,11 @@ request <- function(client, method, path, payload = NULL) {
 do_request <- function(method, url, headers, content) {
   h <- curl::new_handle()
   curl::handle_setheaders(h, .list = as.list(headers))
+  # Set a connect + overall timeout so a hung daemon cannot block forever.
+  curl::handle_setopt(h,
+    connecttimeout = 30L,
+    timeout        = 60L
+  )
   if (!is.null(content)) {
     curl::handle_setopt(h,
       customrequest = method,
@@ -124,6 +134,13 @@ do_request <- function(method, url, headers, content) {
     curl::handle_setopt(h, customrequest = method)
   }
   curl::curl_fetch_memory(url, handle = h)
+}
+
+# Percent-encode a single URL path segment so a table name containing '/',
+# '?', '#', or spaces cannot inject extra segments or break routing.
+# utils::URLencode with reserved = TRUE encodes everything non-unreserved.
+encode_segment <- function(segment) {
+  utils::URLencode(as.character(segment), reserved = TRUE)
 }
 
 # Encode a payload to compact JSON, rejecting non-finite values first.
