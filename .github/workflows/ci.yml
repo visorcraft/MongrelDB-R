@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit (R ${{ matrix.r }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 4.0 is the supported minimum; release is current.
+        r: ['4.0', 'release', 'devel']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up R ${{ matrix.r }}
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r }}
+          use-public-rspm: true
+
+      - name: Cache R packages
+        uses: actions/cache@v6
+        env:
+          cache-name: r-pkgs
+        with:
+          path: ${{ runner.temp }}/Library
+          key: ${{ runner.os }}-r-${{ matrix.r }}-${{ env.cache-name }}-${{ hashFiles('DESCRIPTION') }}
+          restore-keys: ${{ runner.os }}-r-${{ matrix.r }}-${{ env.cache-name }}-
+
+      - name: Install package dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            testthat
+            local::.
+
+      - name: Run unit tests
+        run: |
+          Rscript -e 'testthat::test_file("tests/testthat/test-json.R", reporter = "summary")'
+
+      - name: R CMD check
+        run: |
+          R CMD build .
+          R CMD check --no-manual --no-tests MongrelDB_*.tar.gz
+
+  live:
+    # The layer that catches client/server contract drift. Downloads a
+    # mongreldb-server binary, starts it, and runs the live round-trip suite.
+    name: Live integration (against mongreldb-server)
+    runs-on: ubuntu-latest
+    env:
+      MONGRELDB_URL: http://127.0.0.1:8453
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Cache R packages
+        uses: actions/cache@v6
+        env:
+          cache-name: r-live
+        with:
+          path: ${{ runner.temp }}/Library
+          key: ${{ runner.os }}-r-${{ env.cache-name }}-${{ hashFiles('DESCRIPTION') }}
+          restore-keys: ${{ runner.os }}-r-${{ env.cache-name }}-
+
+      - name: Install package dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            testthat
+            local::.
+
+      - name: Cache mongreldb-server binary
+        uses: actions/cache@v6
+        id: server-cache
+        with:
+          path: /tmp/mongreldb-server
+          key: mongreldb-server-${{ runner.os }}-0.44.1
+
+      - name: Download mongreldb-server
+        if: steps.server-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -L -o /tmp/mongreldb-server \
+            https://github.com/visorcraft/MongrelDB/releases/download/v0.44.1/mongreldb-server-linux-x64
+          chmod +x /tmp/mongreldb-server
+
+      - name: Start mongreldb-server
+        run: |
+          rm -rf /tmp/mongreldb-data
+          /tmp/mongreldb-server /tmp/mongreldb-data --port 8453 > /tmp/mongreldb-server.log 2>&1 &
+          echo $! > /tmp/mongreldb-server.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8453/health >/dev/null 2>&1; then
+              echo "mongreldb-server is healthy"
+              break
+            fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8453/health >/dev/null || (cat /tmp/mongreldb-server.log && exit 1)
+
+      - name: Run live tests
+        env:
+          MONGRELDB_URL: http://127.0.0.1:8453
+        run: |
+          Rscript -e 'testthat::test_file("tests/testthat/test-live.R", reporter = "summary")'
+
+      - name: Dump server log on failure
+        if: failure()
+        run: cat /tmp/mongreldb-server.log
+
+      - name: Stop mongreldb-server
+        if: always()
+        run: |
+          if [ -f /tmp/mongreldb-server.pid ]; then
+            kill "$(cat /tmp/mongreldb-server.pid)" 2>/dev/null || true
+          fi

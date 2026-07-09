@@ -1,0 +1,37 @@
+# R build artifacts
+.RData
+.Rhistory
+.Rapp.history
+*.Rproj
+.Rproj.user/
+
+# Installed package check artifacts
+*.tar.gz
+*.zip
+MongrelDB_*.tar.gz
+
+# Test/coverage output
+*.so
+*.o
+*.dll
+tests/testthat/_snaps/
+tests/testthat/Rplots.pdf
+*.Rcheck/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Agent / assistant instruction files are workspace-local, never published
+AGENTS.md
+CLAUDE.md
+.cursorrules
+.zcode/

@@ -1,0 +1,76 @@
+# Quickstart
+
+This guide walks through installing the MongrelDB R client, connecting to a
+running `mongreldb-server`, and doing your first round-trip of CRUD and query.
+
+## Prerequisites
+
+- R 4.0 or newer.
+- The `curl` and `jsonlite` CRAN packages (`install.packages(c("curl", "jsonlite"))`).
+- A running [`mongreldb-server`](https://github.com/visorcraft/MongrelDB)
+  daemon. The simplest start is the prebuilt Linux binary:
+
+  ```sh
+  curl -L -o mongreldb-server \
+    https://github.com/visorcraft/MongrelDB/releases/download/v0.44.1/mongreldb-server-linux-x64
+  chmod +x mongreldb-server
+  ./mongreldb-server ./data --port 8453
+  ```
+
+## Install
+
+Install from source:
+
+```sh
+R CMD INSTALL .
+```
+
+or from within R:
+
+```r
+install.packages(".", repos = NULL, type = "source")
+```
+
+The client depends on `curl` and `jsonlite` only.
+
+## Connect
+
+```r
+library(MongrelDB)
+
+db <- mongreldb_connect("http://127.0.0.1:8453")
+print(mongreldb_health(db))   # TRUE
+```
+
+## Create a table and insert rows
+
+```r
+# The daemon requires JSON booleans for primary_key / nullable.
+columns <- list(
+  list(id = 1, name = "id",       ty = "int64",   primary_key = TRUE,  nullable = FALSE),
+  list(id = 2, name = "customer", ty = "varchar", primary_key = FALSE, nullable = FALSE),
+  list(id = 3, name = "amount",   ty = "float64", primary_key = FALSE, nullable = FALSE)
+)
+mongreldb_create_table(db, "orders", columns)
+
+# Cells map column id to value.
+mongreldb_put(db, "orders", list(`1` = 1, `2` = "Alice", `3` = 99.50))
+mongreldb_put(db, "orders", list(`1` = 2, `2` = "Bob",   `3` = 150.00))
+
+print(mongreldb_count(db, "orders"))   # 2
+```
+
+## Run a query
+
+```r
+res <- mongreldb_query(db, "orders",
+  list(mongreldb_condition("pk", list(value = 1))))
+```
+
+## Next steps
+
+- [Transactions](transactions.md) for atomic multi-op commits.
+- [Queries](queries.md) for the native index condition API.
+- [SQL](sql.md) for DataFusion-backed ad-hoc SQL.
+- [Auth](auth.md) for Bearer and Basic authentication.
+- [Errors](errors.md) for the exception hierarchy.
