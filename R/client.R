@@ -82,6 +82,11 @@ request <- function(client, method, path, payload = NULL) {
   }
 
   content <- NULL
+
+  # Response size cap (256 MB). Passed to libcurl via CURLOPT_MAXFILESIZE
+  # in do_request so the transfer aborts before buffering oversized bodies.
+  max_bytes <- 256L * 1024L * 1024L # 268435456 bytes
+
   if (!is.null(payload)) {
     content <- encode_payload(payload)
     headers["Content-Type"] <- "application/json"
@@ -102,11 +107,9 @@ request <- function(client, method, path, payload = NULL) {
   status <- resp$status_code
   body <- rawToChar(resp$content)
 
-  # Cap the response body at 256 MB so a runaway query or a misbehaving
-  # daemon cannot exhaust memory. libcurl has already been told to abort the
-  # transfer past this size (see do_request); this is a belt-and-suspenders
-  # check for non-libcurl transports and for responses that slip through.
-  max_bytes <- 256L * 1024L * 1024L # 268435456 bytes
+  # Belt-and-suspenders check: libcurl already aborted oversized transfers
+  # via CURLOPT_MAXFILESIZE in do_request; this catches anything that slips
+  # through (non-libcurl transports, missing Content-Length).
   if (length(resp$content) > max_bytes) {
     stop(new_error("query",
       sprintf("response body exceeds %d bytes (%d bytes)",
