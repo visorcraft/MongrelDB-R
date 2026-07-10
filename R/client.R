@@ -89,7 +89,7 @@ request <- function(client, method, path, payload = NULL) {
   }
 
   resp <- tryCatch(
-    do_request(method, url, headers, content),
+    do_request(method, url, headers, content, max_bytes),
     error = function(e) {
       # Network-level failures (connection refused, DNS, timeout) become a
       # connection error so callers can distinguish them from responses.
@@ -103,7 +103,9 @@ request <- function(client, method, path, payload = NULL) {
   body <- rawToChar(resp$content)
 
   # Cap the response body at 256 MB so a runaway query or a misbehaving
-  # daemon cannot exhaust memory.
+  # daemon cannot exhaust memory. libcurl has already been told to abort the
+  # transfer past this size (see do_request); this is a belt-and-suspenders
+  # check for non-libcurl transports and for responses that slip through.
   max_bytes <- 256L * 1024L * 1024L # 268435456 bytes
   if (length(resp$content) > max_bytes) {
     stop(new_error("query",
@@ -122,9 +124,8 @@ request <- function(client, method, path, payload = NULL) {
   }
 
   if (!nzchar(body)) return(NULL)
-  # SQL SELECT may return Arrow IPC bytes (non-JSON). For the generic request
-  # path, a non-empty body that is not valid JSON is a protocol error, not a
-  # silent NULL. The sql() helper can tolerate NULL/binary separately.
+  # The client requests JSON result formats, so a non-empty body that is not
+  # valid JSON is a protocol error, not a silent NULL.
   tryCatch(
     jsonlite::fromJSON(body, simplifyVector = FALSE),
     error = function(e) {
@@ -136,13 +137,19 @@ request <- function(client, method, path, payload = NULL) {
 }
 
 # Perform the HTTP request via curl. Returns list(status_code, content = raw).
-do_request <- function(method, url, headers, content) {
+# max_bytes is passed through to libcurl via CURLOPT_MAXFILESIZE so the
+# transfer itself is aborted when the response exceeds the limit, rather than
+# only checking after the whole body has been buffered into memory.
+do_request <- function(method, url, headers, content, max_bytes) {
   h <- curl::new_handle()
   curl::handle_setheaders(h, .list = as.list(headers))
   # Set a connect + overall timeout so a hung daemon cannot block forever.
   curl::handle_setopt(h,
     connecttimeout = 30L,
-    timeout        = 60L
+    timeout        = 60L,
+    # Real streaming size guard: tell libcurl to abort the transfer as soon as
+    # the response body exceeds the cap, instead of buffering it all first.
+    maxfilesize    = max_bytes
   )
   if (!is.null(content)) {
     curl::handle_setopt(h,
