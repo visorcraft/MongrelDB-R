@@ -173,5 +173,14 @@ reject_nonfinite <- function(x) {
         "cannot JSON-encode NA, NaN, or Infinity"))
     }
   }
+  # Logical NA (the default `NA` literal is type logical) also has no JSON
+  # representation and must be rejected like numeric NA; is.logical catches it
+  # since the is.numeric branch above only handles numeric values.
+  if (is.logical(x)) {
+    if (any(is.na(x))) {
+      stop(new_error("query",
+        "cannot JSON-encode NA, NaN, or Infinity"))
+    }
+  }
   invisible(NULL)
 }
