@@ -125,18 +125,9 @@ mongreldb_delete_by_pk <- function(client, table, pk) {
 mongreldb_sql <- function(client, statement) {
   # JSON mode makes the server answer with a JSON array of row objects
   # (column names as keys) instead of Arrow IPC bytes. A statement that
-  # produces no rows (INSERT/UPDATE) may still answer with an empty/non-JSON
-  # body, so tolerate that and return NULL.
-  tryCatch(
-    request(client, "POST", "sql", list(sql = statement, format = "json")),
-    error = function(e) {
-      if (grepl("malformed JSON", conditionMessage(e), ignore.case = TRUE)) {
-        NULL
-      } else {
-        stop(e)
-      }
-    }
-  )
+  # produces no rows (INSERT/UPDATE) answers with an empty body, which
+  # request() maps to NULL.
+  request(client, "POST", "sql", list(sql = statement, format = "json"))
 }
 
 #' Run a native query.

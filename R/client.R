@@ -12,6 +12,16 @@ new_client <- function(url, auth_header = NULL) {
   )
 }
 
+# Custom print method that redacts the auth_header so that print(db) or
+# str(db) does not leak the Bearer token or base64-encoded Basic credentials
+# into logs or the console.
+print.mongreldb_client <- function(x, ...) {
+  cat("<MongrelDB client>\n")
+  cat("  URL:", x$url, "\n")
+  cat("  Auth:", if (is.null(x$auth_header)) "none" else "[redacted]", "\n")
+  invisible(x)
+}
+
 #' Connect to a running mongreldb-server daemon.
 #'
 #' @param url Base URL of the daemon, e.g. `"http://127.0.0.1:8453"`.
