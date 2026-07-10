@@ -100,3 +100,59 @@ test_that("reject_nonfinite stops on NaN and Inf", {
   # Finite values and strings pass through without error.
   expect_no_error(MongrelDB:::reject_nonfinite(list(1, 2, "x")))
 })
+
+# Wire-shape conformance: the create_table body must pass enum_variants and
+# default_value through verbatim, with no alias translation, and a column
+# without those keys must not acquire them on the wire.
+test_that("create_table body preserves enum_variants and default_value keys", {
+  columns <- list(
+    list(id = 1, name = "id",      ty = "int64",   primary_key = TRUE,  nullable = FALSE),
+    list(id = 2, name = "label",   ty = "varchar", primary_key = FALSE, nullable = FALSE),
+    list(id = 3, name = "amount",  ty = "float64", primary_key = FALSE, nullable = FALSE),
+    list(
+      id = 4, name = "status", ty = "varchar",
+      primary_key = FALSE, nullable = FALSE,
+      enum_variants = list("active", "inactive", "pending"),
+      default_value  = "pending"
+    )
+  )
+  payload <- list(name = "orders", columns = columns)
+  body <- MongrelDB:::encode_payload(payload)
+
+  # The two pass-through keys appear verbatim in the JSON, with the exact
+  # server-expected spelling.
+  expect_match(body, '"enum_variants"', fixed = TRUE)
+  expect_match(body, '"default_value"',  fixed = TRUE)
+
+  # Round-trip the body and check the nested structure: the enum column
+  # keeps its array of variants and its scalar default, with the column
+  # id, name, and ty intact.
+  dec <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+  status_col <- dec$columns[[4]]
+  expect_equal(status_col$id,            4)
+  expect_equal(status_col$name,          "status")
+  expect_equal(status_col$ty,            "varchar")
+  expect_equal(status_col$default_value, "pending")
+  expect_equal(status_col$enum_variants, list("active", "inactive", "pending"))
+})
+
+test_that("create_table body omits enum_variants and default_value when unset", {
+  # A column without enum_variants / default_value must not leak those keys
+  # onto the wire. encode_payload does not synthesize defaults, so absence
+  # in R stays absence in JSON.
+  columns <- list(
+    list(id = 1, name = "id",     ty = "int64",   primary_key = TRUE,  nullable = FALSE),
+    list(id = 2, name = "label",  ty = "varchar", primary_key = FALSE, nullable = FALSE)
+  )
+  body <- MongrelDB:::encode_payload(list(name = "plain", columns = columns))
+
+  # No column carries either key.
+  expect_no_match(body, '"enum_variants"', fixed = TRUE)
+  expect_no_match(body, '"default_value"',  fixed = TRUE)
+
+  # And the rest of the column shape is intact.
+  dec <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+  expect_equal(length(dec$columns), 2L)
+  expect_equal(dec$columns[[1]]$name, "id")
+  expect_equal(dec$columns[[2]]$name, "label")
+})

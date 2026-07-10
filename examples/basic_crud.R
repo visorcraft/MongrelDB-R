@@ -28,6 +28,27 @@ columns <- list(
 
 mongreldb_create_table(db, table, columns)
 
+# Columns can also carry enum_variants (allowed values for a varchar column)
+# and default_value (used when a put omits the cell). Both keys pass through
+# to the server verbatim.
+tasks <- sprintf("r_tasks_example_%d", as.integer(Sys.time()))
+on.exit(try(mongreldb_drop_table(db, tasks), silent = TRUE))
+
+task_columns <- list(
+  list(id = 1, name = "id",    ty = "int64",   primary_key = TRUE,  nullable = FALSE),
+  list(id = 2, name = "title", ty = "varchar", primary_key = FALSE, nullable = FALSE),
+  list(
+    id = 3, name = "status", ty = "varchar",
+    primary_key   = FALSE, nullable = FALSE,
+    enum_variants = list("todo", "doing", "done"),
+    default_value  = "todo"
+  )
+)
+mongreldb_create_table(db, tasks, task_columns)
+# Omitting cell `3` falls back to default_value = "todo" on the server.
+mongreldb_put(db, tasks, list(`1` = 1, `2` = "wire up the schema"))
+mongreldb_put(db, tasks, list(`1` = 2, `2` = "ship the docs", `3` = "done"))
+
 # Cells map column id to value.
 mongreldb_put(db, table, list(`1` = 1, `2` = "Alice", `3` = 99.50))
 mongreldb_put(db, table, list(`1` = 2, `2` = "Bob",   `3` = 150.00))

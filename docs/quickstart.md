@@ -53,6 +53,21 @@ columns <- list(
 )
 mongreldb_create_table(db, "orders", columns)
 
+# Column descriptors can also carry enum_variants (allowed values for a
+# varchar column) and default_value (used when a put omits the cell). Both
+# keys pass through to the server verbatim.
+task_columns <- list(
+  list(id = 1, name = "id",     ty = "int64",   primary_key = TRUE,  nullable = FALSE),
+  list(id = 2, name = "title",  ty = "varchar", primary_key = FALSE, nullable = FALSE),
+  list(
+    id = 3, name = "status", ty = "varchar",
+    primary_key   = FALSE, nullable = FALSE,
+    enum_variants = list("todo", "doing", "done"),
+    default_value  = "todo"
+  )
+)
+mongreldb_create_table(db, "tasks", task_columns)
+
 # Cells map column id to value.
 mongreldb_put(db, "orders", list(`1` = 1, `2` = "Alice", `3` = 99.50))
 mongreldb_put(db, "orders", list(`1` = 2, `2` = "Bob",   `3` = 150.00))
