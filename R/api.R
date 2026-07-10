@@ -21,7 +21,9 @@ mongreldb_health <- function(client) {
 #' @export
 mongreldb_tables <- function(client) {
   data <- request(client, "GET", "tables")
-  if (is.character(data)) data else character(0)
+  if (is.character(data)) return(data)
+  if (is.list(data)) return(unlist(data, use.names = FALSE))
+  character(0)
 }
 
 #' Create a table.
