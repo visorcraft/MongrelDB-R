@@ -15,15 +15,20 @@ test_that("JSON encode/decode round-trips scalars", {
 test_that("JSON encode/decode round-trips containers", {
   expect_equal(jsonlite::fromJSON(jsonlite::toJSON(1:3)), 1:3)
   obj <- list(a = 1, b = 2)
-  expect_equal(jsonlite::fromJSON(jsonlite::toJSON(obj), simplifyVector = FALSE), obj)
+  # jsonlite wraps scalars in JSON arrays, so a round-trip through
+  # simplifyVector = FALSE yields nested length-1 lists (e.g. list(a = list(1))).
+  # Unwrap each element to recover the original named list across jsonlite 1.x
+  # and 2.x.
+  dec <- jsonlite::fromJSON(jsonlite::toJSON(obj), simplifyVector = FALSE)
+  expect_equal(lapply(dec, unlist), obj)
 })
 
 test_that("UTF-8 strings survive a round-trip", {
   flap <- "mångrel"
-  expect_equal(
-    jsonlite::fromJSON(jsonlite::toJSON(flap), simplifyVector = FALSE),
-    flap
-  )
+  # toJSON wraps the scalar in a JSON array; with simplifyVector = FALSE
+  # fromJSON returns a length-1 list, so extract the element with [[1]].
+  dec <- jsonlite::fromJSON(jsonlite::toJSON(flap), simplifyVector = FALSE)
+  expect_equal(dec[[1]], flap)
 })
 
 test_that("flatten_cells sorts keys ascending and interleaves", {
