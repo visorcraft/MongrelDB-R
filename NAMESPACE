@@ -17,7 +17,7 @@ export(mongreldb_schema)
 export(mongreldb_schema_for)
 export(mongreldb_transaction)
 export(mongreldb_condition)
-export(print.mongreldb_error)
+S3method(print, mongreldb_error)
 
 importFrom(curl, new_handle)
 importFrom(curl, handle_setheaders)
