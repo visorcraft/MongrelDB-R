@@ -15,6 +15,16 @@ mongreldb_health <- function(client) {
   ok
 }
 
+mongreldb_history_retention_epochs <- function(client) {
+  as.numeric(request(client, "GET", "history/retention")$history_retention_epochs)
+}
+mongreldb_earliest_retained_epoch <- function(client) {
+  as.numeric(request(client, "GET", "history/retention")$earliest_retained_epoch)
+}
+mongreldb_set_history_retention_epochs <- function(client, epochs) {
+  request(client, "PUT", "history/retention", list(history_retention_epochs = epochs))
+}
+
 #' List all table names.
 #' @param client A `mongreldb_client`.
 #' @return Character vector of table names.

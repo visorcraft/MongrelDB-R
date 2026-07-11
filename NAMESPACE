@@ -3,6 +3,9 @@
 
 export(mongreldb_connect)
 export(mongreldb_health)
+export(mongreldb_history_retention_epochs)
+export(mongreldb_earliest_retained_epoch)
+export(mongreldb_set_history_retention_epochs)
 export(mongreldb_tables)
 export(mongreldb_create_table)
 export(mongreldb_drop_table)

@@ -117,7 +117,9 @@ test_that("create_table body preserves enum_variants and default_value keys", {
       default_value  = "pending"
     ),
     list(id = 5, name = "created_at", ty = "timestamp", primary_key = FALSE,
-         nullable = FALSE, default_expr = "now")
+         nullable = FALSE, default_expr = "now"),
+    list(id = 6, name = "enabled", ty = "bool", default_value = TRUE),
+    list(id = 7, name = "optional", ty = "varchar", default_value = NULL)
   )
   payload <- list(name = "orders", columns = columns)
   body <- MongrelDB:::encode_payload(payload)
@@ -140,6 +142,8 @@ test_that("create_table body preserves enum_variants and default_value keys", {
   expect_equal(status_col$enum_variants, list("active", "inactive", "pending"))
   expect_equal(dec$columns[[3]]$default_value, 0.5)
   expect_equal(dec$columns[[5]]$default_expr, "now")
+  expect_true(dec$columns[[6]]$default_value)
+  expect_null(dec$columns[[7]]$default_value)
 })
 
 test_that("create_table body omits enum_variants and default_value when unset", {
