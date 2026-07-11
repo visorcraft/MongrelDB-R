@@ -278,7 +278,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide.
 
 ## History retention
 
-Use `mongreldb_history_retention_epochs()`, `mongreldb_set_history_retention_epochs()`, and `mongreldb_earliest_retained_epoch()` with MongrelDB 0.47.1+.
+Use `mongreldb_history_retention_epochs()`, `mongreldb_set_history_retention_epochs()`, and `mongreldb_earliest_retained_epoch()` with MongrelDB 0.48.0+.
 
 ## License
 
