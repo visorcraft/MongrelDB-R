@@ -61,20 +61,25 @@ columns <- list(
 # Create a table.
 mongreldb_create_table(db, "orders", columns)
 
-# Column descriptors can also carry enum_variants (allowed values for a
-# varchar column) and default_value (used when a put omits the cell). Both
+# Column descriptors can also carry enum_variants (allowed values for an
+# enum column) and default_value (used when a put omits the cell). Both
 # keys pass through to the server verbatim.
 task_columns <- list(
   list(id = 1, name = "id",     ty = "int64",   primary_key = TRUE,  nullable = FALSE),
   list(id = 2, name = "title",  ty = "varchar", primary_key = FALSE, nullable = FALSE),
   list(
-    id = 3, name = "status", ty = "varchar",
+    id = 3, name = "status", ty = "enum",
     primary_key  = FALSE, nullable = FALSE,
     enum_variants = list("todo", "doing", "done"),
     default_value  = "todo"
   )
 )
-mongreldb_create_table(db, "tasks", task_columns)
+checks <- list(checks = list(list(
+  id = 1,
+  name = "ck_status",
+  expr = list(IsNotNull = 3)
+)))
+mongreldb_create_table(db, "tasks", task_columns, constraints = checks)
 
 # Insert rows. Cells map column id to value.
 mongreldb_put(db, "orders", list(`1` = 1, `2` = "Alice", `3` = 99.50))
@@ -227,7 +232,7 @@ tryCatch(
 |---|---|
 | `mongreldb_health(client)` | Check daemon health |
 | `mongreldb_tables(client)` | List table names |
-| `mongreldb_create_table(client, name, columns)` | Create a table, returns table id |
+| `mongreldb_create_table(client, name, columns, constraints = NULL)` | Create a table, returns table id |
 | `mongreldb_drop_table(client, name)` | Drop a table |
 | `mongreldb_count(client, table)` | Row count |
 | `mongreldb_put(client, table, cells)` | Insert a row |

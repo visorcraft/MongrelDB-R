@@ -110,7 +110,7 @@ test_that("create_table body preserves enum_variants and default_value keys", {
     list(id = 2, name = "label",   ty = "varchar", primary_key = FALSE, nullable = FALSE),
     list(id = 3, name = "amount",  ty = "float64", primary_key = FALSE, nullable = FALSE),
     list(
-      id = 4, name = "status", ty = "varchar",
+      id = 4, name = "status", ty = "enum",
       primary_key = FALSE, nullable = FALSE,
       enum_variants = list("active", "inactive", "pending"),
       default_value  = "pending"
@@ -131,7 +131,7 @@ test_that("create_table body preserves enum_variants and default_value keys", {
   status_col <- dec$columns[[4]]
   expect_equal(status_col$id,            4)
   expect_equal(status_col$name,          "status")
-  expect_equal(status_col$ty,            "varchar")
+  expect_equal(status_col$ty,            "enum")
   expect_equal(status_col$default_value, "pending")
   expect_equal(status_col$enum_variants, list("active", "inactive", "pending"))
 })

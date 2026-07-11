@@ -35,7 +35,17 @@ testthat::test_that("create_table sends optional column keys only when set", {
     )
   )
 
-  expect_equal(mongreldb_create_table(client, "wire_optional", with_optional), 7L)
+  constraints <- list(
+    checks = list(list(
+      id = 1,
+      name = "ck_status",
+      expr = list(IsNotNull = 2)
+    ))
+  )
+  expect_equal(
+    mongreldb_create_table(client, "wire_optional", with_optional, constraints),
+    7L
+  )
   expect_equal(captured[[1]]$method, "POST")
   expect_match(captured[[1]]$url, "/kit/create_table$", perl = TRUE)
   expect_equal(captured[[1]]$headers[["Content-Type"]], "application/json")
@@ -48,6 +58,8 @@ testthat::test_that("create_table sends optional column keys only when set", {
   expect_true("default_value" %in% names(status_col))
   expect_equal(status_col$enum_variants, list("draft", "active", "archived"))
   expect_equal(status_col$default_value, "draft")
+  expect_equal(optional_payload$constraints$checks[[1]]$name, "ck_status")
+  expect_equal(optional_payload$constraints$checks[[1]]$expr$IsNotNull, 2L)
 
   without_optional <- list(
     list(
