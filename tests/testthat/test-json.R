@@ -108,13 +108,16 @@ test_that("create_table body preserves enum_variants and default_value keys", {
   columns <- list(
     list(id = 1, name = "id",      ty = "int64",   primary_key = TRUE,  nullable = FALSE),
     list(id = 2, name = "label",   ty = "varchar", primary_key = FALSE, nullable = FALSE),
-    list(id = 3, name = "amount",  ty = "float64", primary_key = FALSE, nullable = FALSE),
+    list(id = 3, name = "amount",  ty = "float64", primary_key = FALSE, nullable = FALSE,
+         default_value = 0.5),
     list(
       id = 4, name = "status", ty = "enum",
       primary_key = FALSE, nullable = FALSE,
       enum_variants = list("active", "inactive", "pending"),
       default_value  = "pending"
-    )
+    ),
+    list(id = 5, name = "created_at", ty = "timestamp", primary_key = FALSE,
+         nullable = FALSE, default_expr = "now")
   )
   payload <- list(name = "orders", columns = columns)
   body <- MongrelDB:::encode_payload(payload)
@@ -123,6 +126,7 @@ test_that("create_table body preserves enum_variants and default_value keys", {
   # server-expected spelling.
   expect_match(body, '"enum_variants"', fixed = TRUE)
   expect_match(body, '"default_value"',  fixed = TRUE)
+  expect_match(body, '"default_expr"', fixed = TRUE)
 
   # Round-trip the body and check the nested structure: the enum column
   # keeps its array of variants and its scalar default, with the column
@@ -134,6 +138,8 @@ test_that("create_table body preserves enum_variants and default_value keys", {
   expect_equal(status_col$ty,            "enum")
   expect_equal(status_col$default_value, "pending")
   expect_equal(status_col$enum_variants, list("active", "inactive", "pending"))
+  expect_equal(dec$columns[[3]]$default_value, 0.5)
+  expect_equal(dec$columns[[5]]$default_expr, "now")
 })
 
 test_that("create_table body omits enum_variants and default_value when unset", {

@@ -62,7 +62,8 @@ columns <- list(
 mongreldb_create_table(db, "orders", columns)
 
 # Column descriptors can also carry enum_variants (allowed values for an
-# enum column) and default_value (used when a put omits the cell). Both
+# enum column), default_value (any correctly typed JSON scalar), and
+# default_expr ("now" or "uuid"). These keys
 # keys pass through to the server verbatim.
 task_columns <- list(
   list(id = 1, name = "id",     ty = "int64",   primary_key = TRUE,  nullable = FALSE),

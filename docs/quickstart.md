@@ -68,6 +68,9 @@ task_columns <- list(
 )
 mongreldb_create_table(db, "tasks", task_columns)
 
+# default_value accepts any JSON scalar; supply the column's expected type.
+# Use default_expr = "now" or "uuid" for a dynamic default.
+
 # Cells map column id to value.
 mongreldb_put(db, "orders", list(`1` = 1, `2` = "Alice", `3` = 99.50))
 mongreldb_put(db, "orders", list(`1` = 2, `2` = "Bob",   `3` = 150.00))
