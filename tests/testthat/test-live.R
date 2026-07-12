@@ -130,6 +130,43 @@ test_that("range query returns only rows within the bounds", {
   expect_equal(vapply(selected, function(r) r$id, numeric(1)), c(3, 4))
 })
 
+test_that("history retention getters/setter and AS OF EPOCH query round-trip", {
+  db <- mongreldb_connect(server_url)
+  original <- mongreldb_history_retention_epochs(db)
+  expect_gt(original, 0)
+
+  on.exit(mongreldb_set_history_retention_epochs(db, original), add = TRUE)
+
+  # Use a tight window so the earliest retained epoch advances past zero.
+  set <- mongreldb_set_history_retention_epochs(db, 1L)
+  expect_equal(set$history_retention_epochs, 1)
+
+  table <- paste0("r_retention_", unique_suffix)
+  mongreldb_create_table(db, table, columns)
+  inserted <- mongreldb_put(db, table, list(`1` = 1, `2` = "alpha", `3` = 1.0))
+  insert_epoch <- attr(inserted, "epoch")
+  expect_gt(insert_epoch, 0)
+
+  # Update the same row at a later epoch.
+  mongreldb_upsert(db, table,
+    list(`1` = 1, `2` = "updated", `3` = 10.0),
+    update_cells = list(`2` = "updated", `3` = 10.0))
+
+  earliest <- mongreldb_earliest_retained_epoch(db)
+  expect_gt(earliest, 0)
+
+  # The row as of the insert epoch must still show the original value.
+  selected <- mongreldb_sql(db,
+    sprintf("SELECT id, label FROM %s AS OF EPOCH %s", table, as.character(insert_epoch)))
+  expect_equal(length(selected), 1L)
+  expect_equal(selected[[1]]$id, 1)
+  expect_equal(selected[[1]]$label, "alpha")
+
+  # The current value reflects the update.
+  current <- mongreldb_sql(db, sprintf("SELECT id, label FROM %s", table))
+  expect_equal(current[[1]]$label, "updated")
+})
+
 test_that("tables() lists the created table", {
   db <- mongreldb_connect(server_url)
   table <- paste0("r_tables_", unique_suffix)

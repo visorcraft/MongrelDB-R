@@ -15,15 +15,53 @@ mongreldb_health <- function(client) {
   ok
 }
 
+#' Get the current history-retention window.
+#'
+#' @param client A `mongreldb_client`.
+#' @return The current retention window in epochs.
+#' @export
 mongreldb_history_retention_epochs <- function(client) {
-  as.numeric(request(client, "GET", "history/retention")$history_retention_epochs)
+  as_u64_scalar(
+    request(client, "GET", "history/retention")$history_retention_epochs,
+    "history_retention_epochs"
+  )
 }
+
+#' Get the oldest epoch still queryable with `AS OF EPOCH`.
+#'
+#' @param client A `mongreldb_client`.
+#' @return The oldest retained epoch.
+#' @export
 mongreldb_earliest_retained_epoch <- function(client) {
-  as.numeric(request(client, "GET", "history/retention")$earliest_retained_epoch)
+  as_u64_scalar(
+    request(client, "GET", "history/retention")$earliest_retained_epoch,
+    "earliest_retained_epoch"
+  )
 }
+
+#' Set the history-retention window.
+#'
+#' @param client A `mongreldb_client`.
+#' @param epochs New retention window in epochs.
+#' @return The updated retention response from the server.
+#' @export
 mongreldb_set_history_retention_epochs <- function(client, epochs) {
+  epochs <- as_u64_scalar(epochs, "epochs")
   request(client, "PUT", "history/retention", list(history_retention_epochs = epochs))
 }
+
+# Aliases matching the names in PLAN.md section 3 (Tier-2 repositories).
+# The canonical public names below keep the `_epochs` suffix consistent with
+# the server field and the other language clients; these aliases exist only
+# for acceptance-criteria parity.
+
+#' @rdname mongreldb_history_retention_epochs
+#' @export
+mongreldb_history_retention <- mongreldb_history_retention_epochs
+
+#' @rdname mongreldb_set_history_retention_epochs
+#' @export
+mongreldb_set_history_retention <- mongreldb_set_history_retention_epochs
 
 #' List all table names.
 #' @param client A `mongreldb_client`.
@@ -196,5 +234,9 @@ mongreldb_transaction <- function(client, ops, idempotency_key = NULL) {
   payload <- list(ops = ops)
   if (!is.null(idempotency_key)) payload$idempotency_key <- idempotency_key
   data <- request(client, "POST", "kit/txn", payload)
-  if (is.list(data) && !is.null(data$results)) data$results else list()
+  results <- if (is.list(data) && !is.null(data$results)) data$results else list()
+  if (is.list(data) && !is.null(data$epoch)) {
+    attr(results, "epoch") <- as_u64_scalar(data$epoch, "epoch")
+  }
+  results
 }

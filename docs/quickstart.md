@@ -69,7 +69,19 @@ task_columns <- list(
 mongreldb_create_table(db, "tasks", task_columns)
 
 # default_value accepts any JSON scalar; supply the column's expected type.
+# An explicit NULL stays a static null, a missing default_value means no
+# default, and literal "now"/"uuid" values in default_value are static strings.
 # Use default_expr = "now" or "uuid" for a dynamic default.
+
+event_columns <- list(
+  list(id = 1, name = "message", ty = "varchar",   primary_key = FALSE, nullable = FALSE, default_value = "none"),
+  list(id = 2, name = "count",   ty = "int64",     primary_key = FALSE, nullable = FALSE, default_value = 0),
+  list(id = 3, name = "active",  ty = "bool",      primary_key = FALSE, nullable = FALSE, default_value = TRUE),
+  list(id = 4, name = "extra",   ty = "varchar",   primary_key = FALSE, nullable = TRUE,  default_value = NULL),
+  list(id = 5, name = "tag",     ty = "varchar",   primary_key = FALSE, nullable = FALSE, default_value = "now"),
+  list(id = 6, name = "created", ty = "timestamp", primary_key = FALSE, nullable = FALSE, default_expr = "now")
+)
+mongreldb_create_table(db, "events", event_columns)
 
 # Cells map column id to value.
 mongreldb_put(db, "orders", list(`1` = 1, `2` = "Alice", `3` = 99.50))
@@ -83,6 +95,21 @@ print(mongreldb_count(db, "orders"))   # 2
 ```r
 res <- mongreldb_query(db, "orders",
   list(mongreldb_condition("pk", list(value = 1))))
+```
+
+## History retention
+
+Control the time-travel window and query historical rows with `AS OF EPOCH`:
+
+```r
+window  <- mongreldb_history_retention_epochs(db)
+earliest <- mongreldb_earliest_retained_epoch(db)
+
+# Requires admin auth. Increasing the window cannot restore already-pruned
+# history past the previous earliest epoch.
+mongreldb_set_history_retention_epochs(db, window + 10)
+
+rows <- mongreldb_sql(db, sprintf("SELECT id FROM orders AS OF EPOCH %s", earliest))
 ```
 
 ## Next steps

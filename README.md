@@ -63,8 +63,10 @@ mongreldb_create_table(db, "orders", columns)
 
 # Column descriptors can also carry enum_variants (allowed values for an
 # enum column), default_value (any correctly typed JSON scalar), and
-# default_expr ("now" or "uuid"). These keys
-# keys pass through to the server verbatim.
+# default_expr ("now" or "uuid"). These keys pass through to the server
+# verbatim. An explicit NULL default_value stays a static null, a missing
+# default_value means no default, and literal "now"/"uuid" values in
+# default_value are static strings.
 task_columns <- list(
   list(id = 1, name = "id",     ty = "int64",   primary_key = TRUE,  nullable = FALSE),
   list(id = 2, name = "title",  ty = "varchar", primary_key = FALSE, nullable = FALSE),
@@ -82,6 +84,17 @@ checks <- list(checks = list(list(
 )))
 mongreldb_create_table(db, "tasks", task_columns, constraints = checks)
 
+# All static-default shapes pass through with their original JSON types.
+event_columns <- list(
+  list(id = 1, name = "message", ty = "varchar",   primary_key = FALSE, nullable = FALSE, default_value = "none"),
+  list(id = 2, name = "count",   ty = "int64",     primary_key = FALSE, nullable = FALSE, default_value = 0),
+  list(id = 3, name = "active",  ty = "bool",      primary_key = FALSE, nullable = FALSE, default_value = TRUE),
+  list(id = 4, name = "extra",   ty = "varchar",   primary_key = FALSE, nullable = TRUE,  default_value = NULL),
+  list(id = 5, name = "tag",     ty = "varchar",   primary_key = FALSE, nullable = FALSE, default_value = "now"),
+  list(id = 6, name = "created", ty = "timestamp", primary_key = FALSE, nullable = FALSE, default_expr = "now")
+)
+mongreldb_create_table(db, "events", event_columns)
+
 # Insert rows. Cells map column id to value.
 mongreldb_put(db, "orders", list(`1` = 1, `2` = "Alice", `3` = 99.50))
 mongreldb_put(db, "orders", list(`1` = 2, `2` = "Bob",   `3` = 150.00))
@@ -92,7 +105,7 @@ mongreldb_upsert(db, "orders", list(`1` = 1, `2` = "Alice", `3` = 120.00),
 
 # Query with a native index condition (learned-range index).
 res <- mongreldb_query(db, "orders", list(
-  mongreldb_condition("range", list(column = 3, min = 100.0))
+  mongreldb_condition("range_f64", list(column = 3, min = 100.0))
 ), projection = c(1, 2), limit = 100)
 
 print(mongreldb_count(db, "orders"))   # 2
@@ -151,7 +164,7 @@ mongreldb_query(db, "orders", list(
 
 # Range query (learned-range index).
 mongreldb_query(db, "orders", list(
-  mongreldb_condition("range", list(column = 3, min = 50.0, max = 150.0))
+  mongreldb_condition("range_f64", list(column = 3, min = 50.0, max = 150.0))
 ), limit = 100)
 
 # Full-text search (FM-index).
@@ -165,7 +178,7 @@ mongreldb_query(db, "embeddings", list(
 
 # Check whether a result was capped by the limit.
 res <- mongreldb_query(db, "orders", list(
-  mongreldb_condition("range", list(column = 3, min = 0))), limit = 100)
+  mongreldb_condition("range_f64", list(column = 3, min = 0))), limit = 100)
 if (isTRUE(res$truncated)) {
   # result set hit the limit; more matches exist on the server.
 }
@@ -232,6 +245,9 @@ tryCatch(
 | Function | Description |
 |---|---|
 | `mongreldb_health(client)` | Check daemon health |
+| `mongreldb_history_retention_epochs(client)` | Current history-retention window (epochs) |
+| `mongreldb_earliest_retained_epoch(client)` | Oldest epoch still queryable with `AS OF EPOCH` |
+| `mongreldb_set_history_retention_epochs(client, epochs)` | Set the history-retention window; requires admin |
 | `mongreldb_tables(client)` | List table names |
 | `mongreldb_create_table(client, name, columns, constraints = NULL)` | Create a table, returns table id |
 | `mongreldb_drop_table(client, name)` | Drop a table |
@@ -278,7 +294,19 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide.
 
 ## History retention
 
-Use `mongreldb_history_retention_epochs()`, `mongreldb_set_history_retention_epochs()`, and `mongreldb_earliest_retained_epoch()` with MongrelDB 0.48.0+.
+History retention controls how far back `AS OF EPOCH` time-travel queries can
+read. Use these functions with `mongreldb-server` 0.48.0+:
+
+```r
+window  <- mongreldb_history_retention_epochs(db)
+earliest <- mongreldb_earliest_retained_epoch(db)
+
+# Increase the window. Requires admin auth. Increasing retention cannot
+# restore history already pruned past the previous earliest epoch.
+mongreldb_set_history_retention_epochs(db, window + 10)
+
+rows <- mongreldb_sql(db, sprintf("SELECT id FROM orders AS OF EPOCH %s", earliest))
+```
 
 ## License
 

@@ -87,3 +87,45 @@ testthat::test_that("create_table sends optional column keys only when set", {
   expect_false("enum_variants" %in% names(plain_col))
   expect_false("default_value" %in% names(plain_col))
 })
+
+testthat::test_that("create_table preserves the full static-default matrix", {
+  captured <- list()
+  testthat::local_mocked_bindings(
+    do_request = function(method, url, headers, content, max_bytes) {
+      captured[[length(captured) + 1L]] <<- list(
+        method = method,
+        url = url,
+        headers = headers,
+        content = content,
+        max_bytes = max_bytes
+      )
+      list(status_code = 200L, content = charToRaw('{"table_id":11}'))
+    },
+    .package = "MongrelDB"
+  )
+
+  client <- mongreldb_connect("http://127.0.0.1:1")
+
+  cols <- list(
+    list(id = 10, name = "s",        ty = "varchar",   primary_key = FALSE, nullable = FALSE, default_value = "hello"),
+    list(id = 11, name = "n",        ty = "int64",     primary_key = FALSE, nullable = FALSE, default_value = 42),
+    list(id = 12, name = "b",        ty = "bool",      primary_key = FALSE, nullable = FALSE, default_value = TRUE),
+    list(id = 13, name = "nl",       ty = "varchar",   primary_key = FALSE, nullable = TRUE,  default_value = NULL),
+    list(id = 14, name = "now_lit",  ty = "varchar",   primary_key = FALSE, nullable = FALSE, default_value = "now"),
+    list(id = 15, name = "uuid_lit", ty = "varchar",   primary_key = FALSE, nullable = FALSE, default_value = "uuid"),
+    list(id = 16, name = "expr",     ty = "timestamp", primary_key = FALSE, nullable = FALSE, default_expr = "now")
+  )
+
+  expect_equal(mongreldb_create_table(client, "matrix", cols), 11L)
+
+  payload <- jsonlite::fromJSON(captured[[1]]$content, simplifyVector = FALSE)
+  c <- payload$columns
+  expect_equal(c[[1]]$default_value, "hello")
+  expect_equal(c[[2]]$default_value, 42L)
+  expect_equal(c[[3]]$default_value, TRUE)
+  expect_null(c[[4]]$default_value)
+  expect_equal(c[[5]]$default_value, "now")
+  expect_equal(c[[6]]$default_value, "uuid")
+  expect_equal(c[[7]]$default_expr, "now")
+  expect_false("default_value" %in% names(c[[7]]))
+})

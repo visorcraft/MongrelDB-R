@@ -15,6 +15,7 @@ new_client <- function(url, auth_header = NULL) {
 # Custom print method that redacts the auth_header so that print(db) or
 # str(db) does not leak the Bearer token or base64-encoded Basic credentials
 # into logs or the console.
+#' @exportS3Method
 print.mongreldb_client <- function(x, ...) {
   cat("<MongrelDB client>\n")
   cat("  URL:", x$url, "\n")
@@ -30,6 +31,7 @@ print.mongreldb_client <- function(x, ...) {
 #' @param password Optional password for HTTP Basic mode.
 #' @return A `mongreldb_client` object to pass to the other functions.
 #' @export
+#' @importFrom base64enc base64encode
 mongreldb_connect <- function(url, token = NULL, username = NULL,
                               password = NULL) {
   auth_header <- NULL

@@ -13,7 +13,6 @@
 #   mongreldb_create_table(db, "orders", columns)
 #   mongreldb_put(db, "orders", list(`1` = 1, `2` = "Alice", `3` = 99.5))
 
-#' @useDynLib MongrelDB, .registration = TRUE
 #' @importFrom curl new_handle handle_setheaders handle_setopt curl_fetch_memory
 #' @importFrom jsonlite fromJSON toJSON unbox
 "_PACKAGE"

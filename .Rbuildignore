@@ -1,0 +1,12 @@
+^\.gitignore$
+^\.agents/.*$
+^\.claude/.*$
+^\.github/.*$
+^\.worktrees/.*$
+^AGENTS\.md$
+^CLAUDE\.md$
+^CONTRIBUTING\.md$
+^PLAN\.md$
+^README\.md$
+^r-libs/.*$
+^tests/testthat/_problems/.*$

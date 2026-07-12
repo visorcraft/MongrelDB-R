@@ -30,6 +30,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Local dependency library
+r-libs/
+
 # Agent / assistant instruction files are workspace-local, never published
 AGENTS.md
 CLAUDE.md
