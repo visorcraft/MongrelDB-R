@@ -9,7 +9,8 @@ mongreldb_query(
   table,
   conditions = list(),
   projection = NULL,
-  limit = NULL
+  limit = NULL,
+  offset = NULL
 )
 }
 \arguments{
@@ -22,6 +23,8 @@ mongreldb_query(
 \item{projection}{Optional integer vector of column ids to return.}
 
 \item{limit}{Optional integer row cap.}
+
+\item{offset}{Optional number of matching rows to skip before applying \code{limit}.}
 }
 \value{
 A list with \code{rows} and \code{truncated} (\code{TRUE} if the result hit the

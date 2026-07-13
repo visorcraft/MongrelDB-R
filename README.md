@@ -256,7 +256,7 @@ tryCatch(
 | `mongreldb_upsert(client, table, cells, update_cells)` | Upsert a row |
 | `mongreldb_delete(client, table, row_id)` | Delete by row ID |
 | `mongreldb_delete_by_pk(client, table, pk)` | Delete by primary key |
-| `mongreldb_query(client, table, conditions, projection, limit)` | Run a native query |
+| `mongreldb_query(client, table, conditions, projection, limit, offset)` | Run a paged native query |
 | `mongreldb_sql(client, statement)` | Execute SQL |
 | `mongreldb_schema(client)` | Full schema catalog |
 | `mongreldb_schema_for(client, table)` | Single table schema |

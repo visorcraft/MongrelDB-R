@@ -187,15 +187,17 @@ mongreldb_sql <- function(client, statement) {
 #' @param conditions A list of condition lists from [mongreldb_condition()].
 #' @param projection Optional integer vector of column ids to return.
 #' @param limit Optional integer row cap.
+#' @param offset Optional number of matching rows to skip.
 #' @return A list with `rows` and `truncated` (`TRUE` if the result hit the
 #'   limit).
 #' @export
 mongreldb_query <- function(client, table, conditions = list(),
-                            projection = NULL, limit = NULL) {
+                            projection = NULL, limit = NULL, offset = NULL) {
   payload <- list(table = table)
   if (length(conditions) > 0) payload$conditions <- conditions
   if (!is.null(projection)) payload$projection <- as.list(projection)
   if (!is.null(limit)) payload$limit <- limit
+  if (!is.null(offset)) payload$offset <- offset
   data <- request(client, "POST", "kit/query", payload)
   if (!is.list(data)) return(list(rows = list(), truncated = FALSE))
   list(
