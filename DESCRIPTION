@@ -1,7 +1,7 @@
 Package: MongrelDB
 Type: Package
 Title: Pure R Client for MongrelDB
-Version: 0.60.2
+Version: 0.60.3
 Date: 2026-07-08
 Authors@R: person("Visorcraft", email = "noreply@visorcraft.com", role = c("aut", "cre"))
 Author: Visorcraft [aut, cre]
