@@ -81,11 +81,13 @@ mongreldb_tables <- function(client) {
 #' @param columns A list of column descriptor lists. `primary_key` and
 #'   `nullable` must be JSON booleans (`TRUE`/`FALSE`).
 #' @param constraints Optional table constraints list, including `checks`.
+#' @param indexes Optional full secondary-index descriptor list.
 #' @return The new table id (integer), or `0L` if none was reported.
 #' @export
-mongreldb_create_table <- function(client, name, columns, constraints = NULL) {
+mongreldb_create_table <- function(client, name, columns, constraints = NULL, indexes = NULL) {
   body <- list(name = name, columns = columns)
   if (!is.null(constraints)) body$constraints <- constraints
+  if (!is.null(indexes)) body$indexes <- indexes
   data <- request(client, "POST", "kit/create_table",
     body)
   if (is.list(data) && !is.null(data$table_id)) as.integer(data$table_id) else 0L

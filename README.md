@@ -249,7 +249,7 @@ tryCatch(
 | `mongreldb_earliest_retained_epoch(client)` | Oldest epoch still queryable with `AS OF EPOCH` |
 | `mongreldb_set_history_retention_epochs(client, epochs)` | Set the history-retention window; requires admin |
 | `mongreldb_tables(client)` | List table names |
-| `mongreldb_create_table(client, name, columns, constraints = NULL)` | Create a table, returns table id |
+| `mongreldb_create_table(client, name, columns, constraints = NULL, indexes = NULL)` | Create a table with optional constraints and all index definitions |
 | `mongreldb_drop_table(client, name)` | Drop a table |
 | `mongreldb_count(client, table)` | Row count |
 | `mongreldb_put(client, table, cells)` | Insert a row |

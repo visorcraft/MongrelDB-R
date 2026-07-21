@@ -88,6 +88,41 @@ testthat::test_that("create_table sends optional column keys only when set", {
   expect_false("default_value" %in% names(plain_col))
 })
 
+testthat::test_that("create_table sends all indexes and embedding source", {
+  captured <- list()
+  testthat::local_mocked_bindings(
+    do_request = function(method, url, headers, content, max_bytes) {
+      captured[[1L]] <<- list(content = content)
+      list(status_code = 200L, content = charToRaw('{"table_id":1}'))
+    },
+    .package = "MongrelDB"
+  )
+  client <- mongreldb_connect("http://127.0.0.1:1")
+  columns <- list(
+    list(id = 1, name = "id", ty = "int64", primary_key = TRUE),
+    list(id = 2, name = "embedding", ty = "embedding(384)", embedding_source = list(
+      kind = "configured_model", provider_id = "docs", model_id = "model", model_version = "1"
+    ))
+  )
+  indexes <- list(
+    list(name = "bm", column_id = 1, kind = "bitmap"),
+    list(name = "fm", column_id = 1, kind = "fm_index"),
+    list(name = "ann", column_id = 2, kind = "ann", predicate = "embedding IS NOT NULL",
+      options = list(ann = list(m = 24, ef_construction = 96, ef_search = 48,
+        quantization = "dense"))),
+    list(name = "range", column_id = 1, kind = "learned_range"),
+    list(name = "minhash", column_id = 1, kind = "minhash"),
+    list(name = "sparse", column_id = 1, kind = "sparse")
+  )
+  expect_equal(mongreldb_create_table(client, "search_docs", columns, indexes = indexes), 1L)
+  payload <- jsonlite::fromJSON(captured[[1]]$content, simplifyVector = FALSE)
+  expect_equal(payload$columns[[2]]$embedding_source$kind, "configured_model")
+  expect_equal(vapply(payload$indexes, `[[`, character(1), "kind"),
+    c("bitmap", "fm_index", "ann", "learned_range", "minhash", "sparse"))
+  expect_equal(payload$indexes[[3]]$options$ann$quantization, "dense")
+  expect_equal(payload$indexes[[3]]$predicate, "embedding IS NOT NULL")
+})
+
 testthat::test_that("create_table preserves the full static-default matrix", {
   captured <- list()
   testthat::local_mocked_bindings(
