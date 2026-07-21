@@ -109,7 +109,8 @@ testthat::test_that("create_table sends all indexes and embedding source", {
     list(name = "fm", column_id = 1, kind = "fm_index"),
     list(name = "ann", column_id = 2, kind = "ann", predicate = "embedding IS NOT NULL",
       options = list(ann = list(m = 24, ef_construction = 96, ef_search = 48,
-        quantization = "dense"))),
+        quantization = "dense", algorithm = "diskann",
+        diskann = list(r = 64, l = 128, beam_width = 8, alpha = 120)))),
     list(name = "range", column_id = 1, kind = "learned_range"),
     list(name = "minhash", column_id = 1, kind = "minhash"),
     list(name = "sparse", column_id = 1, kind = "sparse")
@@ -120,6 +121,8 @@ testthat::test_that("create_table sends all indexes and embedding source", {
   expect_equal(vapply(payload$indexes, `[[`, character(1), "kind"),
     c("bitmap", "fm_index", "ann", "learned_range", "minhash", "sparse"))
   expect_equal(payload$indexes[[3]]$options$ann$quantization, "dense")
+  expect_equal(payload$indexes[[3]]$options$ann$algorithm, "diskann")
+  expect_equal(payload$indexes[[3]]$options$ann$diskann$r, 64)
   expect_equal(payload$indexes[[3]]$predicate, "embedding IS NOT NULL")
 })
 
