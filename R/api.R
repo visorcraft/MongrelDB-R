@@ -167,6 +167,163 @@ mongreldb_delete_by_pk <- function(client, table, pk) {
   invisible(NULL)
 }
 
+#' Structural HLC from durable recovery (0.64+).
+#' @param raw List with `physical_micros`, optional `logical`, `node_tiebreaker`.
+#' @return List or `NULL` when absent.
+#' @export
+mongreldb_parse_commit_hlc <- function(raw) {
+  if (!is.list(raw) || is.null(raw$physical_micros)) return(NULL)
+  list(
+    physical_micros = as.numeric(raw$physical_micros),
+    logical = as.integer(if (is.null(raw$logical)) 0L else raw$logical),
+    node_tiebreaker = as.integer(if (is.null(raw$node_tiebreaker)) 0L else raw$node_tiebreaker)
+  )
+}
+
+.mongreldb_parse_durable_outcome <- function(raw) {
+  if (!is.list(raw)) raw <- list()
+  list(
+    committed = if ("committed" %in% names(raw)) raw$committed else NULL,
+    committed_statements = raw$committed_statements,
+    last_commit_epoch = raw$last_commit_epoch,
+    last_commit_epoch_text = raw$last_commit_epoch_text,
+    last_commit_hlc = mongreldb_parse_commit_hlc(raw$last_commit_hlc),
+    first_commit_statement_index = raw$first_commit_statement_index,
+    last_commit_statement_index = raw$last_commit_statement_index,
+    completed_statements = raw$completed_statements,
+    statement_index = raw$statement_index,
+    serialization = if (is.null(raw$serialization)) "" else as.character(raw$serialization),
+    serialization_state = raw$serialization_state,
+    terminal_state = raw$terminal_state
+  )
+}
+
+#' Decode GET /queries/\{id\} body into a structural status (0.64+).
+#' @param raw Decoded JSON list.
+#' @return List with `commit_hlc` and `serialization_state` helpers as attributes.
+#' @export
+mongreldb_parse_query_status <- function(raw) {
+  if (!is.list(raw)) raw <- list()
+  outcome <- .mongreldb_parse_durable_outcome(raw$outcome)
+  durable <- if (is.list(raw$durable)) .mongreldb_parse_durable_outcome(raw$durable) else NULL
+  status <- list(
+    query_id = if (is.null(raw$query_id)) "" else as.character(raw$query_id),
+    status = if (is.null(raw$status)) "" else as.character(raw$status),
+    state = if (is.null(raw$state)) "" else as.character(raw$state),
+    server_state = if (!is.null(raw$server_state)) as.character(raw$server_state)
+      else if (!is.null(raw$state)) as.character(raw$state) else "",
+    terminal_state = raw$terminal_state,
+    committed = if ("committed" %in% names(raw)) raw$committed else NULL,
+    committed_statements = raw$committed_statements,
+    last_commit_epoch = raw$last_commit_epoch,
+    last_commit_hlc = mongreldb_parse_commit_hlc(raw$last_commit_hlc),
+    outcome = outcome,
+    durable = durable,
+    raw = raw
+  )
+  class(status) <- c("mongreldb_query_status", "list")
+  status
+}
+
+#' Authoritative commit HLC from a [mongreldb_parse_query_status()] object.
+#' @param status Query status list.
+#' @export
+mongreldb_commit_hlc <- function(status) {
+  if (is.list(status$durable) && !is.null(status$durable$last_commit_hlc)) {
+    return(status$durable$last_commit_hlc)
+  }
+  if (is.list(status$outcome) && !is.null(status$outcome$last_commit_hlc)) {
+    return(status$outcome$last_commit_hlc)
+  }
+  status$last_commit_hlc
+}
+
+#' Serialization state preferring nested durable/outcome fields.
+#' @param status Query status list.
+#' @export
+mongreldb_serialization_state <- function(status) {
+  if (is.list(status$durable)) {
+    if (!is.null(status$durable$serialization_state) &&
+        nzchar(as.character(status$durable$serialization_state))) {
+      return(as.character(status$durable$serialization_state))
+    }
+    if (!is.null(status$durable$serialization) &&
+        nzchar(as.character(status$durable$serialization))) {
+      return(as.character(status$durable$serialization))
+    }
+  }
+  if (is.list(status$outcome)) {
+    if (!is.null(status$outcome$serialization_state) &&
+        nzchar(as.character(status$outcome$serialization_state))) {
+      return(as.character(status$outcome$serialization_state))
+    }
+    if (!is.null(status$outcome$serialization)) {
+      return(as.character(status$outcome$serialization))
+    }
+  }
+  ""
+}
+
+#' Text → embed → ANN retrieve (`POST kit/retrieve_text`, 0.64+).
+#' @inheritParams mongreldb_put
+#' @param embedding_column Integer column id of the embedding.
+#' @param text Query text.
+#' @param k Optional top-k.
+#' @param deadline_ms Optional deadline.
+#' @param max_work Optional work budget.
+#' @export
+mongreldb_retrieve_text <- function(client, table, embedding_column, text,
+                                    k = NULL, deadline_ms = NULL, max_work = NULL) {
+  if (is.null(table) || !nzchar(table)) {
+    stop(new_error("query", "table is required"))
+  }
+  if (is.null(text) || !nzchar(text)) {
+    stop(new_error("query", "text is required"))
+  }
+  payload <- list(
+    table = table,
+    embedding_column = as.integer(embedding_column),
+    text = text
+  )
+  if (!is.null(k)) payload$k <- as.integer(k)
+  if (!is.null(deadline_ms)) payload$deadline_ms <- as.numeric(deadline_ms)
+  if (!is.null(max_work)) payload$max_work <- as.numeric(max_work)
+  data <- request(client, "POST", "kit/retrieve_text", payload)
+  if (!is.list(data)) return(list(hits = list(), provenance = list()))
+  list(
+    hits = if (!is.null(data$hits)) data$hits else list(),
+    provenance = if (!is.null(data$provenance)) data$provenance else list()
+  )
+}
+
+#' Retained SQL status for durable recovery (`GET queries/\{query_id\}`).
+#' @inheritParams mongreldb_health
+#' @param query_id Client/server query id.
+#' @export
+mongreldb_query_status <- function(client, query_id) {
+  if (is.null(query_id) || !nzchar(query_id)) {
+    stop(new_error("query", "query_id is required"))
+  }
+  data <- request(client, "GET", paste0("queries/", encode_segment(query_id)))
+  if (!is.list(data)) {
+    stop(new_error("query", "query status response was not a JSON object"))
+  }
+  mongreldb_parse_query_status(data)
+}
+
+#' Request cancellation of a running SQL query.
+#' @inheritParams mongreldb_query_status
+#' @export
+mongreldb_cancel_query <- function(client, query_id) {
+  if (is.null(query_id) || !nzchar(query_id)) {
+    stop(new_error("query", "query_id is required"))
+  }
+  data <- request(client, "POST",
+                  paste0("queries/", encode_segment(query_id), "/cancel"),
+                  list())
+  if (is.list(data)) data else list()
+}
+
 #' Execute SQL.
 #'
 #' Requests the JSON result format, so a SELECT returns a JSON array of row
