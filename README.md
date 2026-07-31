@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://cran.r-project.org/package=MongrelDB"><img src="https://img.shields.io/badge/CRAN-MongrelDB-276DC3.svg" alt="CRAN" /></a>
+  <a href="https://github.com/visorcraft/MongrelDB-R"><img src="https://img.shields.io/badge/install-GitHub-276DC3.svg" alt="Install from GitHub" /></a>
   <a href="https://www.r-project.org/"><img src="https://img.shields.io/badge/R-%3E%3D4.0-276DC3.svg" alt="R" /></a>
   <a href="#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg" alt="License" /></a>
 </p>
@@ -18,7 +18,23 @@
 
 | Surface | Package | Install |
 |---|---|---|
-| R client | `MongrelDB` | `install.packages("MongrelDB")` or `R CMD INSTALL .` |
+| R client | `MongrelDB` | `remotes::install_github()` or `R CMD INSTALL .` (see below) |
+
+## Install
+
+The package is not yet on CRAN. Install it from GitHub:
+
+```r
+remotes::install_github("visorcraft/MongrelDB-R")
+```
+
+Or from a clone:
+
+```sh
+git clone https://github.com/visorcraft/MongrelDB-R.git
+cd MongrelDB-R
+R CMD INSTALL .
+```
 
 ## Requirements
 
