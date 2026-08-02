@@ -340,6 +340,11 @@ mongreldb_set_history_retention_epochs(db, window + 10)
 rows <- mongreldb_sql(db, sprintf("SELECT id FROM orders AS OF EPOCH %s", earliest))
 ```
 
+## Related tools
+
+- [Mongrel](https://visorcraft.com/mongreldb) — Commercial multi-system workbench with native MongrelDB support.
+- [MongrelDB Viewer](https://github.com/visorcraft/MongrelDB-Viewer) — Free, open-source MongrelDB GUI and MCP server.
+
 ## License
 
 Dual-licensed under the **MIT License** or the **Apache License, Version 2.0**,
